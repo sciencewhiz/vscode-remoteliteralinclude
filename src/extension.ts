@@ -165,7 +165,7 @@ function selectLines(source: string, options: Map<string, string | undefined>): 
     const pattern = startAt ?? startAfter!;
     const foundAt = lines.findIndex(line => line.text.includes(pattern));
     if (foundAt < 0) {
-      throw new Error(`Start marker not found: ${pattern}`);
+      return [];
     }
     lines = lines.slice(startAt !== undefined ? foundAt : foundAt + 1);
   }
@@ -176,20 +176,16 @@ function selectLines(source: string, options: Map<string, string | undefined>): 
     const pattern = endAt ?? endBefore!;
     const foundAt = lines.findIndex(line => line.text.includes(pattern));
     if (foundAt < 0) {
-      throw new Error(`End marker not found: ${pattern}`);
+      return [];
     }
     lines = lines.slice(0, foundAt + (endAt !== undefined ? 1 : 0));
   }
 
   const linesOption = options.get('lines');
   if (linesOption) {
-    const indexes = parseLineSpec(linesOption, lines.length);
+    const indexes = parseLineSpec(linesOption, lines.length, true);
     lines = indexes.map(index => {
-      const line = lines[index - 1];
-      if (!line) {
-        throw new Error(`Line number ${index} is out of range (1-${lines.length}).`);
-      }
-      return line;
+      return lines[index - 1];
     });
   }
 
@@ -206,24 +202,21 @@ function selectLines(source: string, options: Map<string, string | undefined>): 
     }
   }
 
-  if (lines.length === 0) {
-    throw new Error('The include selection contains no lines.');
-  }
   return lines;
 }
 
 function splitSourceLines(source: string): DisplayLine[] {
+  if (source.length === 0) {
+    return [];
+  }
   const rawLines = source.split(/\r\n|\n|\r/);
   if (/(?:\r\n|\n|\r)$/.test(source)) {
     rawLines.pop();
   }
-  if (rawLines.length === 0 || (rawLines.length === 1 && rawLines[0] === '')) {
-    throw new Error('The remote include is empty.');
-  }
   return rawLines.map((text, index) => ({ text, sourceLine: index + 1 }));
 }
 
-function parseLineSpec(spec: string, maximum?: number): number[] {
+function parseLineSpec(spec: string, maximum?: number, ignoreOutOfRange = false): number[] {
   const result: number[] = [];
   for (const part of spec.split(',')) {
     const token = part.trim();
@@ -231,14 +224,17 @@ function parseLineSpec(spec: string, maximum?: number): number[] {
     if (range) {
       const start = Number(range[1]);
       const requestedEnd = range[2] ? Number(range[2]) : (maximum ?? Number.MAX_SAFE_INTEGER);
-      const end = maximum === undefined ? requestedEnd : Math.min(requestedEnd, maximum);
-      if (start < 1 || end < start) {
+      if (start < 1 || (range[2] && requestedEnd < start)) {
         throw new Error(`Invalid line range: ${token}`);
       }
-      if (maximum !== undefined && start > maximum) {
+      if (maximum !== undefined && start > maximum && !ignoreOutOfRange) {
         throw new Error(`Line number ${start} is out of range (1-${maximum}).`);
       }
-      for (let line = start; line <= end; line++) {
+      if (maximum !== undefined && start > maximum) {
+        continue;
+      }
+      const end = maximum === undefined ? requestedEnd : Math.min(requestedEnd, maximum);
+      for (let line = start; line <= end && (maximum === undefined || line <= maximum); line++) {
         result.push(line);
       }
       continue;
@@ -249,6 +245,9 @@ function parseLineSpec(spec: string, maximum?: number): number[] {
       throw new Error(`Invalid line selection: ${token}`);
     }
     if (maximum !== undefined && line > maximum) {
+      if (ignoreOutOfRange) {
+        continue;
+      }
       throw new Error(`Line number ${line} is out of range (1-${maximum}).`);
     }
     result.push(line);
@@ -275,11 +274,13 @@ function renderPreview(
 ): string {
   const includedSourceLines = new Set(selectedLines.map(line => line.sourceLine));
   const emphasizedLines = options.get('emphasize-lines')
-    ? parseLineSpec(options.get('emphasize-lines')!, selectedLines.length)
+    ? parseLineSpec(options.get('emphasize-lines')!, selectedLines.length, true)
       .map(index => selectedLines[index - 1].sourceLine)
     : [];
   const emphasizedSourceLines = new Set(emphasizedLines);
-  const focusSourceLine = selectedLines[Math.floor(selectedLines.length / 2)].sourceLine;
+  const focusSourceLine = selectedLines.length > 0
+    ? selectedLines[Math.floor(selectedLines.length / 2)].sourceLine
+    : undefined;
   const nonce = Math.random().toString(36).slice(2);
   if (linenoMatchAndStartConflict(options)) {
     throw new Error('The :lineno-match: and :lineno-start: options cannot be used together.');
@@ -287,7 +288,7 @@ function renderPreview(
   const rows = allLines.map(line => {
     const includedClass = includedSourceLines.has(line.sourceLine) ? ' included' : '';
     const emphasizedClass = emphasizedSourceLines.has(line.sourceLine) ? ' emphasized' : '';
-    const focusClass = line.sourceLine === focusSourceLine ? ' focus' : '';
+    const focusClass = focusSourceLine !== undefined && line.sourceLine === focusSourceLine ? ' focus' : '';
     return `<div class="line${includedClass}${emphasizedClass}${focusClass}"><span class="number">${line.sourceLine}</span><span class="code">${escapeHtml(line.text)}</span></div>`;
   }).join('\n');
   const language = options.get('language');
