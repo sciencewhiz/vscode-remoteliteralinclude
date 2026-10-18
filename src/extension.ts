@@ -116,10 +116,11 @@ async function previewInclude(
     const selectedLines = selectLines(source, include.options);
     const allLines = splitSourceLines(source);
     const html = renderPreview(include.url, allLines, selectedLines, include.options);
+    const panelTitle = buildPanelTitle(url);
 
     const panel = vscode.window.createWebviewPanel(
       'sphinxRemoteLiteralInclude.preview',
-      `Remote Include: ${url.hostname}`,
+      panelTitle,
       vscode.ViewColumn.Beside,
       { enableScripts: true }
     );
@@ -128,6 +129,31 @@ async function previewInclude(
     const message = error instanceof Error ? error.message : String(error);
     void vscode.window.showErrorMessage(`Remote literalinclude preview failed: ${message}`);
   }
+}
+
+function buildPanelTitle(url: URL): string {
+  const maxLength = 30;
+  const prefix = 'RLI: ';
+  const components = [url.host, ...url.pathname.split('/').filter(Boolean)];
+  if (url.search || url.hash) {
+    components.push(`${url.search}${url.hash}`);
+  }
+
+  let suffix = '';
+  let firstIncluded = components.length;
+  while (firstIncluded > 0) {
+    const candidate = [components[firstIncluded - 1], suffix].filter(Boolean).join('/');
+    const truncatedCandidate = firstIncluded > 1 ? `.../${candidate}` : candidate;
+    if (prefix.length + truncatedCandidate.length > maxLength) {
+      break;
+    }
+    suffix = candidate;
+    firstIncluded--;
+  }
+
+  const isTruncated = firstIncluded > 0;
+  const titleSuffix = isTruncated ? (suffix ? `.../${suffix}` : '...') : suffix;
+  return `${prefix}${titleSuffix}`.slice(0, maxLength);
 }
 
 async function fetchRemote(url: string, timeoutMs: number): Promise<Response> {
@@ -293,6 +319,7 @@ function renderPreview(
   }).join('\n');
   const language = options.get('language');
   const title = language ? `Language: ${escapeHtml(language)}` : 'Remote source';
+  const fullTitle = escapeHtml(`RLI: ${url}`);
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -318,7 +345,7 @@ function renderPreview(
 </style>
 </head>
 <body>
-<header><h1>Remote literalinclude</h1><div class="url">${escapeHtml(url)}</div><div class="language">${title}</div></header>
+<header><h1 title="${fullTitle}">Remote literalinclude</h1><div class="url">${escapeHtml(url)}</div><div class="language">${title}</div></header>
 <div class="source" role="region" aria-label="Remote source with line numbers"><div>${rows}</div></div>
 <script nonce="${nonce}">
   const source = document.querySelector('.source');
