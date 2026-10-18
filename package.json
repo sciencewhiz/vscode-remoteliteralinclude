@@ -1,0 +1,49 @@
+{
+  "name": "sphinx-remote-literalinclude",
+  "displayName": "Sphinx Remote Literal Include",
+  "description": "Preview Sphinx remoteliteralinclude directives in reStructuredText files.",
+  "version": "0.1.0",
+  "publisher": "wpilibsuite",
+  "license": "BSD-3-Clause",
+  "engines": {
+    "vscode": "^1.95.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onLanguage:restructuredtext"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "sphinxRemoteLiteralInclude.preview",
+        "title": "Sphinx Remote Literal Include: Preview Remote Include"
+      }
+    ],
+    "configuration": {
+      "title": "Sphinx Remote Literal Include",
+      "properties": {
+        "sphinxRemoteLiteralInclude.requestTimeout": {
+          "type": "number",
+          "default": 15000,
+          "minimum": 1000,
+          "description": "Timeout in milliseconds for fetching a remote include."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "package": "vsce package --allow-missing-repository",
+    "watch": "tsc -watch -p ./"
+  },
+  "devDependencies": {
+    "@types/node": "^20.17.0",
+    "@types/vscode": "^1.95.0",
+    "@vscode/vsce": "^4.0.0",
+    "typescript": "^5.6.3"
+  }
+}
