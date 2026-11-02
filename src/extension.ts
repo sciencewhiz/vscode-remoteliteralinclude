@@ -304,9 +304,7 @@ function renderPreview(
       .map(index => selectedLines[index - 1].sourceLine)
     : [];
   const emphasizedSourceLines = new Set(emphasizedLines);
-  const focusSourceLine = selectedLines.length > 0
-    ? selectedLines[Math.floor(selectedLines.length / 2)].sourceLine
-    : undefined;
+  const focusSourceLine = selectedLines[0]?.sourceLine;
   const nonce = Math.random().toString(36).slice(2);
   if (linenoMatchAndStartConflict(options)) {
     throw new Error('The :lineno-match: and :lineno-start: options cannot be used together.');
@@ -351,7 +349,8 @@ function renderPreview(
   const source = document.querySelector('.source');
   const focus = document.querySelector('.focus');
   if (source && focus) {
-    requestAnimationFrame(() => focus.scrollIntoView({ block: 'center', inline: 'nearest' }));
+    const context = focus.previousElementSibling?.previousElementSibling ?? focus;
+    requestAnimationFrame(() => context.scrollIntoView({ block: 'start', inline: 'nearest' }));
   }
 </script>
 </body>
